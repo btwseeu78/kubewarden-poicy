@@ -1,0 +1,5 @@
+auditScanner:
+  policyReporter: true
+policy-reporter: # subchart values settings
+  ui:
+    enabled: true

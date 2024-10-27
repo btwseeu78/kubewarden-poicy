@@ -1,0 +1,85 @@
+apiVersion: policies.kubewarden.io/v1
+kind: ClusterAdmissionPolicy
+metadata:
+  name: "allowed-priorityclass"
+  annotations:
+    io.kubewarden.policy.category: Best practices
+    io.kubewarden.policy.severity: low
+spec:
+  mutating: false
+  module: ghcr.io/kubewarden/policies/cel-policy:v1.0.0
+  failurePolicy: Fail
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values:
+      - kubewarden
+      - kube-system
+      - kube-public
+      - kube-node-lease
+    - key: platform.io/userspace
+      operator: In
+      values:
+      - "true"
+  rules:
+    - apiGroups: [""]
+      apiVersions: ["v1"]
+      resources: ["pods"]
+      operations: ["CREATE", "UPDATE"]
+  contextAwareResources:
+    - apiVersion: v1
+      kind: Namespace
+    - apiVersion: v1
+      kind: Pod
+    
+  settings:
+    variables:
+      - name: allowedpriorityclass
+        expression: |
+          ["standard", "critical", "stratagic"]
+      - name: getnamespace
+        expression: |
+          object.metadata.namespace
+      - name: namespacelist
+        expression: |
+          kw.k8s.apiVersion('v1').kind('Namespace').list().items
+      
+      - name: filteredns
+        expression: |
+          variables.namespacelist
+          .filter(i, i.metadata.name == variables.getnamespace)
+          .map(i, i.metadata.labels)
+      - name: getpriotyclassfrompod
+        expression: |
+          object.spec.priorityClassName
+      - name: getdefaultfromns
+        expression: |
+         'platform.io/criticity' in variables.filteredns[0] ?  variables.filteredns[0]['platform.io/criticity'] : "1"
+      - name: supportedclass
+        expression: |
+          variables.getpriotyclassfrompod  in variables.allowedpriorityclass
+      - name: definesvars
+        expression: |
+          {
+            "standard": "1",
+            "critical": "2",
+            "stratagic": "3"
+          }
+      - name: definedvlue
+        expression: |
+          !variables.supportedclass ? "5" : variables.definesvars[variables.getpriotyclassfrompod]
+    validations:
+      # - expression: |
+      #     int(variables.getdefaultfromns) == 1
+      #   message: "unsupported priority class"
+      # - expression: |
+      #     variables.definesvars[object.spec.priorityClassName] <=  variables.criticityfromns
+      #   message: "unsupported priority class"
+      # - expression: |
+      #     !variables.unsupportedclass
+      #   message: "unsupported priority class"
+      - expression: |
+          int(variables.definedvlue) <=  int(variables.getdefaultfromns)
+        message: "unsupported priority class"
+      

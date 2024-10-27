@@ -1,0 +1,27 @@
+apiVersion: policies.kubewarden.io/v1alpha2
+kind: ClusterAdmissionPolicy
+metadata:
+  name: readonlyrootfilesystem
+spec:
+  policyServer: default
+  module: registry://ghcr.io/kubewarden/policies/readonly-root-filesystem-psp:v0.1.6
+  rules:
+  - apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods"]
+    operations:
+    - CREATE
+    - UPDATE
+  mutating: false
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values:
+      - kubewarden
+      - kube-system
+      - kube-public
+      - kube-node-lease
+    - key: platform.io/userspace
+      operator: Equals
+      value: "true"

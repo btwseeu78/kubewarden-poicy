@@ -1,0 +1,32 @@
+apiVersion: policies.kubewarden.io/v1alpha2
+kind: ClusterAdmissionPolicy
+metadata:
+  name: psp-allowedprocmounttypes-ae58a
+spec:
+  module: registry://ghcr.io/kubewarden/policies/sysctl-psp:v0.1.12
+  rules:
+    - apiGroups:
+        - ""
+      apiVersions:
+        - v1
+      resources:
+        - pods
+      operations:
+        - CREATE
+        - UPDATE
+  mutating: false
+  settings:
+    forbiddenSysctls:
+      - kernel.m*
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values:
+      - kubewarden
+      - kube-system
+      - kube-public
+      - kube-node-lease
+    - key: platform.io/userspace
+      operator: Equals
+      value: "true"

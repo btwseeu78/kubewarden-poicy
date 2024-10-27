@@ -1,0 +1,29 @@
+apiVersion: policies.kubewarden.io/v1alpha2
+kind: ClusterAdmissionPolicy
+metadata:
+  name: defaultallowprivilegeescalationdisabled
+spec:
+  module: registry://ghcr.io/kubewarden/policies/allow-privilege-escalation-psp:v0.2.6
+  rules:
+    - apiGroups: [""]
+      apiVersions: ["v1"]
+      resources: ["pods"]
+      scope: "Namespaced"
+      operations:
+      - CREATE
+      - UPDATE
+  mutating: true
+  settings:
+    default_allow_privilege_escalation: false
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values:
+      - kubewarden
+      - kube-system
+      - kube-public
+      - kube-node-lease
+    - key: platform.io/userspace
+      operator: Equals
+      value: "true"

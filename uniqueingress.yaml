@@ -1,0 +1,48 @@
+apiVersion: policies.kubewarden.io/v1
+kind: ClusterAdmissionPolicy
+metadata:
+  name: "unique-ingress"
+  annotations:
+    io.kubewarden.policy.category: Best practices
+    io.kubewarden.policy.severity: low
+spec:
+  mutating: false
+  module: ghcr.io/kubewarden/policies/cel-policy:v1.0.0
+  failurePolicy: Fail
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values:
+      - kubewarden
+      - kube-system
+      - kube-public
+      - kube-node-lease
+    - key: platform.io/userspace
+      operator: Equals
+      value: "true"
+  rules:
+    - apiGroups: ["networking.k8s.io"]
+      apiVersions: ["v1"]
+      resources: ["ingresses"]
+      operations: ["CREATE", "UPDATE"]
+  contextAwareResources:
+    - apiVersion: networking.k8s.io/v1
+      kind: Ingress
+  settings:
+    variables:
+      - name: knownIngresses
+        expression: |
+          kw.k8s.apiVersion("networking.k8s.io/v1").kind("Ingress").list().items
+      - name: knownHosts
+        expression: |
+          variables.knownIngresses
+          .filter(i, (i.metadata.name != object.metadata.name) && (i.metadata.namespace != object.metadata.namespace))
+          .map(i, i.spec.rules.map(r, r.host))
+      - name: desiredHosts
+        expression: |
+          object.spec.rules.map(r, r.host)
+    validations:
+      - expression: |
+          !variables.knownHosts.exists_one(hosts, sets.intersects(hosts, variables.desiredHosts))
+        message: "Cannot reuse a host across multiple ingresses"

@@ -1,0 +1,5 @@
+{
+    "yaml.schemas": {
+        "kubernetes://schema/policies.kubewarden.io/v1@clusteradmissionpolicy": "file:///Users/arpan-k8s/kubewarden/uniqueingress.yaml"
+    }
+}

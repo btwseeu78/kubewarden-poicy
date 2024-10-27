@@ -1,0 +1,37 @@
+apiVersion: policies.kubewarden.io/v1
+kind: ClusterAdmissionPolicy
+metadata:
+  name: check-pods-with-same-names
+  annotations:
+    io.kubewarden.policy.category: Best practices
+    io.kubewarden.policy.severity: low
+spec:
+  module: registry://ghcr.io/kubewarden/policies/cel-policy:v1.0.0
+  failurePolicy: Ignore
+  settings:
+    variables:
+    - name: knownCm
+      expression: |
+        kw.k8s.apiVersion('v1').kind('Configmap').list().items
+    - name: cmName
+      expression: |
+        variables.knownCm
+        .filter(i, (i.metadata.name != object.metadata.name) && (i.metadata.namespace == object.metadata.namespace))
+        .map(i,i.metadata.name)
+    validations:
+    - expression: |
+        variables.cmName.size() == 0
+      message: "Cannot reuse same named cm across multiple ns"
+  rules:
+  - apiGroups:
+    - ''
+    apiVersions:
+    - v1
+    resources:
+    - 'ConfigMap'
+    operations:
+    - CREATE
+  mutating: false
+  contextAwareResources:
+  - apiVersion: v1
+    kind: Configmap
